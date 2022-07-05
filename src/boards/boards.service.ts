@@ -1,48 +1,46 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Board, BoardStatus } from './boards.model';
-import { v1 as uuid } from 'uuid';
+import { InjectRepository } from '@nestjs/typeorm';
+import { BoardRepository } from './BoardRepository';
+import { Board } from './boards.entity';
+import { BoardStatus } from './boards.status.enum';
 import { CreateBoardDto } from './dto/create-board.dto';
 
 @Injectable()
 export class BoardsService {
-  private boards: Board[] = [];
+  constructor(
+    @InjectRepository(BoardRepository)
+    private boardRepository: BoardRepository,
+  ) {}
 
-  getAllBoards(): Board[] {
-    return this.boards;
+  async getAllBoards(): Promise<Board[]> {
+    return this.boardRepository.find();
   }
 
-  getBoardById(id: string): Board {
-    const board = this.boards.find((board) => board.id === id);
+  async getBoardId(id: number): Promise<Board> {
+    const found = await this.boardRepository.findOne(id);
 
-    // https://brunch.co.kr/@hyeminimi/31
-    if (!board) {
-      throw new NotFoundException(`Can't find board with id ${id}`);
+    if (!found) {
+      throw new NotFoundException(`can't find board with id ${id}`);
     }
 
-    return board;
+    return found;
   }
 
-  createBoard(createBoardDto: CreateBoardDto): Board {
-    const { title, description } = createBoardDto;
-
-    const board: Board = {
-      id: uuid(),
-      title,
-      description,
-      status: BoardStatus.PUBLIC,
-    };
-
-    this.boards.push(board);
-    return board;
+  async createBoard(CreateBoardDto: CreateBoardDto): Promise<Board> {
+    return await this.boardRepository.createBoard(CreateBoardDto);
   }
 
-  updateBoardStatus(id: string, status: BoardStatus): Board {
-    const board = this.getBoardById(id);
+  async updateBoard(id: number, status: BoardStatus): Promise<Board> {
+    const board = await this.getBoardId(id);
+
     board.status = status;
+    await this.boardRepository.save(board);
+
     return board;
   }
 
-  deleteBoard(id: string): void {
-    this.boards = this.boards.filter((board) => board.id !== id);
+  deleteBoard(id: number): Promise<void> {
+    // 왜 await을 안써도 잘 되는지?
+    return this.boardRepository.deleteBoard(id);
   }
 }
